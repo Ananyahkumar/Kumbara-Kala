@@ -29,7 +29,8 @@ import com.example.kumbarakala.model.Product
 fun CatalogScreen(
     onProductSelected: (Product) -> Unit,
     onNavigateToBio: () -> Unit,
-    onCreateCustomStory: () -> Unit
+    onCreateCustomStory: () -> Unit,
+    onOpenSavedGallery: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -78,10 +79,20 @@ fun CatalogScreen(
                 onClick = onCreateCustomStory,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 8.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Create Story Card From Your Product")
+            }
+
+            OutlinedButton(
+                onClick = onOpenSavedGallery,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("My Saved Story Cards")
             }
             
             LazyVerticalGrid(

@@ -1,6 +1,7 @@
 package com.example.kumbarakala.ui.screens
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kumbarakala.data.ProductData
+import com.example.kumbarakala.data.SavedStoryCard
+import com.example.kumbarakala.data.StoryCardRepository
 import com.example.kumbarakala.utils.BitmapUtils
 import com.example.kumbarakala.utils.ImageUtils
 import com.example.kumbarakala.utils.ShareUtils
@@ -38,14 +41,36 @@ import kotlinx.coroutines.withContext
 @Composable
 fun StoryGeneratorScreen(
     productId: String?,
+    savedCardIdToEdit: String? = null,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
     val profileRepository = remember { com.example.kumbarakala.data.ProfileRepository(context) }
+    val storyCardRepository = remember { StoryCardRepository(context) }
     val coroutineScope = rememberCoroutineScope()
     
-    val product = ProductData.products.find { it.id == productId }
-    val isCustomMode = productId == "custom"
+    var editedCard by remember { mutableStateOf<SavedStoryCard?>(null) }
+    var editLoadDone by remember { mutableStateOf(savedCardIdToEdit == null) }
+
+    LaunchedEffect(savedCardIdToEdit) {
+        if (savedCardIdToEdit == null) {
+            editLoadDone = true
+            return@LaunchedEffect
+        }
+        editedCard = withContext(Dispatchers.IO) {
+            storyCardRepository.getSavedCard(savedCardIdToEdit)
+        }
+        editLoadDone = true
+    }
+
+    val catalogProduct = remember(editedCard, productId) {
+        val pid = editedCard?.catalogProductId ?: productId
+        when {
+            pid == null || pid == "custom" -> null
+            else -> ProductData.products.find { it.id == pid }
+        }
+    }
+
     val makerTitle = profileRepository.getTitle()
     val makerLocation = profileRepository.getMakerLocation()
     val makerExperience = profileRepository.getMakerExperience()
@@ -54,14 +79,39 @@ fun StoryGeneratorScreen(
     val makerName = profileRepository.getName()
     val makerPhone = profileRepository.getPhone()
     
-    var productName by remember { mutableStateOf(product?.name ?: "") }
-    var healthBenefit by remember { mutableStateOf(product?.healthBenefitDescription ?: "") }
-    var ecoBenefit by remember { mutableStateOf(product?.ecoBenefitDescription ?: "") }
+    val seedCatalogItem = remember(productId) {
+        when {
+            productId == null || productId == "custom" -> null
+            else -> ProductData.products.find { it.id == productId }
+        }
+    }
+
+    var productName by remember { mutableStateOf(seedCatalogItem?.name ?: "") }
+    var healthBenefit by remember { mutableStateOf(seedCatalogItem?.healthBenefitDescription ?: "") }
+    var ecoBenefit by remember { mutableStateOf(seedCatalogItem?.ecoBenefitDescription ?: "") }
     var extraDetails by remember { mutableStateOf("") }
     var productImageUri by remember { mutableStateOf<Uri?>(null) }
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showPreview by remember { mutableStateOf(false) }
+    var showSaveToGalleryDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
+    var userPickedNewImage by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editedCard?.id) {
+        val c = editedCard ?: return@LaunchedEffect
+        productName = c.productName
+        healthBenefit = c.healthBenefit
+        ecoBenefit = c.ecoBenefit
+        extraDetails = c.extraDetails
+        userPickedNewImage = false
+        val customFile = storyCardRepository.getCustomImageFile(c)
+        productImageUri = if (customFile?.exists() == true) Uri.fromFile(customFile) else null
+        val bmp = withContext(Dispatchers.IO) {
+            BitmapFactory.decodeFile(storyCardRepository.getCardFile(c).absolutePath)
+        }
+        previewBitmap = bmp
+        showPreview = bmp != null
+    }
     val selectedPreviewBitmap by remember(productImageUri) {
         mutableStateOf(productImageUri?.let { ImageUtils.decodeUriToBitmap(context, it) })
     }
@@ -72,6 +122,7 @@ fun StoryGeneratorScreen(
     ) { success ->
         if (success) {
             productImageUri = cameraImageUri
+            userPickedNewImage = true
         }
     }
 
@@ -80,16 +131,27 @@ fun StoryGeneratorScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             productImageUri = uri
+            userPickedNewImage = true
         }
     }
 
-    if (product == null && !isCustomMode) {
+    if (!editLoadDone) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    if (savedCardIdToEdit != null && editedCard == null) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("Product not found.")
+            Text("Saved story card not found.")
             Button(onClick = onNavigateBack) {
                 Text("Go Back")
             }
@@ -97,10 +159,36 @@ fun StoryGeneratorScreen(
         return
     }
 
+    if (savedCardIdToEdit == null) {
+        val catalogExists = productId == "custom" ||
+            (productId != null && ProductData.products.any { it.id == productId })
+        if (!catalogExists) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Product not found.")
+                Button(onClick = onNavigateBack) {
+                    Text("Go Back")
+                }
+            }
+            return
+        }
+    }
+
+    fun catalogIdForPersistence(): String =
+        editedCard?.catalogProductId ?: productId ?: "custom"
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Generate Story Card", color = MaterialTheme.colorScheme.onPrimary) },
+                title = {
+                    Text(
+                        if (savedCardIdToEdit != null) "Edit Story Card" else "Generate Story Card",
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -117,6 +205,75 @@ fun StoryGeneratorScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
+        if (showSaveToGalleryDialog && previewBitmap != null) {
+            AlertDialog(
+                onDismissRequest = { showSaveToGalleryDialog = false },
+                title = {
+                    Text(if (editedCard != null) "Update saved card?" else "Save to gallery?")
+                },
+                text = {
+                    Text(
+                        if (editedCard != null) {
+                            "Replace this entry in My Saved Story Cards with the new preview?"
+                        } else {
+                            "Save this story card to My Saved Story Cards on the catalog screen so you can open it anytime."
+                        }
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val bmp = previewBitmap
+                            if (bmp != null) {
+                                coroutineScope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        val cid = catalogIdForPersistence()
+                                        val ec = editedCard
+                                        if (ec != null) {
+                                            storyCardRepository.updateSavedCard(
+                                                id = ec.id,
+                                                bitmap = bmp,
+                                                productName = productName,
+                                                healthBenefit = healthBenefit,
+                                                ecoBenefit = ecoBenefit,
+                                                extraDetails = extraDetails,
+                                                catalogProductId = cid,
+                                                newCustomImageUri = productImageUri.takeIf { userPickedNewImage }
+                                            )
+                                        } else {
+                                            storyCardRepository.saveCard(
+                                                bitmap = bmp,
+                                                productName = productName,
+                                                healthBenefit = healthBenefit,
+                                                ecoBenefit = ecoBenefit,
+                                                extraDetails = extraDetails,
+                                                catalogProductId = cid,
+                                                customImageUri = productImageUri
+                                            )
+                                        }
+                                    }
+                                    Toast.makeText(
+                                        context,
+                                        if (editedCard != null) "Saved story card updated" else "Saved to My Saved Story Cards",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    showSaveToGalleryDialog = false
+                                    userPickedNewImage = false
+                                }
+                            }
+                        }
+                    ) {
+                        Text(if (editedCard != null) "Update" else "Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSaveToGalleryDialog = false }) {
+                        Text("Don't save")
+                    }
+                }
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -140,10 +297,10 @@ fun StoryGeneratorScreen(
                                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
                             contentScale = ContentScale.Crop
                         )
-                    } else if (product != null) {
+                    } else if (catalogProduct != null) {
                         Image(
-                            painter = painterResource(id = product.imageResId),
-                            contentDescription = product.name,
+                            painter = painterResource(id = catalogProduct.imageResId),
+                            contentDescription = catalogProduct.name,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
@@ -281,11 +438,12 @@ fun StoryGeneratorScreen(
                                     makerSpecialization = makerSpecialization,
                                     makerEmail = makerEmail,
                                     productBitmap = inputBitmap,
-                                    fallbackImageResId = product?.imageResId
+                                    fallbackImageResId = catalogProduct?.imageResId
                                 )
                             }
                             previewBitmap = bitmap
                             showPreview = true
+                            showSaveToGalleryDialog = true
                         } catch (e: Exception) {
                             Toast.makeText(context, "Error generating card", Toast.LENGTH_SHORT).show()
                             e.printStackTrace()
@@ -353,6 +511,49 @@ fun StoryGeneratorScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Share WhatsApp")
                     }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        val bmp = previewBitmap ?: return@OutlinedButton
+                        coroutineScope.launch {
+                            withContext(Dispatchers.IO) {
+                                val cid = catalogIdForPersistence()
+                                val ec = editedCard
+                                if (ec != null) {
+                                    storyCardRepository.updateSavedCard(
+                                        id = ec.id,
+                                        bitmap = bmp,
+                                        productName = productName,
+                                        healthBenefit = healthBenefit,
+                                        ecoBenefit = ecoBenefit,
+                                        extraDetails = extraDetails,
+                                        catalogProductId = cid,
+                                        newCustomImageUri = productImageUri.takeIf { userPickedNewImage }
+                                    )
+                                } else {
+                                    storyCardRepository.saveCard(
+                                        bitmap = bmp,
+                                        productName = productName,
+                                        healthBenefit = healthBenefit,
+                                        ecoBenefit = ecoBenefit,
+                                        extraDetails = extraDetails,
+                                        catalogProductId = cid,
+                                        customImageUri = productImageUri
+                                    )
+                                }
+                            }
+                            Toast.makeText(
+                                context,
+                                if (editedCard != null) "Saved story card updated" else "Saved to My Saved Story Cards",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            userPickedNewImage = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (editedCard != null) "Update My Story Cards" else "Save to My Story Cards")
                 }
             }
         }

@@ -3,13 +3,15 @@ package com.example.kumbarakala.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.kumbarakala.data.ProfileRepository
 import com.example.kumbarakala.ui.screens.ArtisanBioScreen
 import com.example.kumbarakala.ui.screens.CatalogScreen
+import com.example.kumbarakala.ui.screens.SavedStoryGalleryScreen
 import com.example.kumbarakala.ui.screens.StoryGeneratorScreen
 import com.example.kumbarakala.ui.auth.AuthScreen
 
@@ -20,6 +22,11 @@ sealed class Screen(val route: String) {
         fun createRoute(productId: String) = "story_generator/$productId"
     }
     object ArtisanBio : Screen("artisan_bio")
+    object SavedStoryGallery : Screen("saved_story_gallery")
+
+    object StoryGeneratorEdit : Screen("story_generator/edit/{savedCardId}") {
+        fun createRoute(savedCardId: String) = "story_generator/edit/$savedCardId"
+    }
 }
 
 @Composable
@@ -52,6 +59,9 @@ fun KumbaraKalaApp() {
                 },
                 onCreateCustomStory = {
                     navController.navigate(Screen.StoryGenerator.createRoute("custom"))
+                },
+                onOpenSavedGallery = {
+                    navController.navigate(Screen.SavedStoryGallery.route)
                 }
             )
         }
@@ -60,6 +70,23 @@ fun KumbaraKalaApp() {
             val productId = backStackEntry.arguments?.getString("productId")
             StoryGeneratorScreen(
                 productId = productId,
+                savedCardIdToEdit = null,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.StoryGeneratorEdit.route,
+            arguments = listOf(
+                navArgument("savedCardId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val savedCardId = backStackEntry.arguments?.getString("savedCardId")
+            StoryGeneratorScreen(
+                productId = null,
+                savedCardIdToEdit = savedCardId,
                 onNavigateBack = {
                     navController.popBackStack()
                 }
@@ -75,6 +102,15 @@ fun KumbaraKalaApp() {
                     navController.navigate(Screen.Auth.route) {
                         popUpTo(0) { inclusive = true }
                     }
+                }
+            )
+        }
+
+        composable(Screen.SavedStoryGallery.route) {
+            SavedStoryGalleryScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onEditSavedCard = { savedCardId ->
+                    navController.navigate(Screen.StoryGeneratorEdit.createRoute(savedCardId))
                 }
             )
         }
