@@ -44,10 +44,10 @@ Product catalog assets and artisan imagery used in the app:
 
 | Catalog | Story assets |
 |---------|----------------|
-| ![Traditional Curd Pot](docs/screenshots/curd_pot.png) | ![Clay lamp](docs/screenshots/clay_lamp.png) |
-| ![Cooking pan](docs/screenshots/clay_pan.png) | ![Artisan portrait](docs/screenshots/artisan_portrait.png) |
+| ![Traditional Curd Pot](app/src/main/res/drawable-nodpi/curd_pot.png) | ![Clay lamp](app/src/main/res/drawable-nodpi/clay_lamp.png) |
+| ![Cooking pan](app/src/main/res/drawable-nodpi/clay_pan.png) | ![Artisan portrait](app/src/main/res/drawable-nodpi/artisan_portrait.png) |
 
-> **Tip:** After running the app on an emulator or device, you can add full UI screenshots under `docs/screenshots/` and link them here.
+> **Tip:** After running the app on an emulator or device, add full UI screenshots under `docs/` and link them here.
 
 ---
 
