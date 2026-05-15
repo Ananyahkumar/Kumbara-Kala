@@ -40,14 +40,21 @@ Many artisans lack a simple digital way to explain why their clay products matte
 
 ## Screenshots
 
-Product catalog assets and artisan imagery used in the app:
+### Login
 
-| Catalog | Story assets |
-|---------|----------------|
-| ![Traditional Curd Pot](app/src/main/res/drawable-nodpi/curd_pot.png) | ![Clay lamp](app/src/main/res/drawable-nodpi/clay_lamp.png) |
-| ![Cooking pan](app/src/main/res/drawable-nodpi/clay_pan.png) | ![Artisan portrait](app/src/main/res/drawable-nodpi/artisan_portrait.png) |
+![Login screen](docs/screenshots/login.png)
 
-> **Tip:** After running the app on an emulator or device, add full UI screenshots under `docs/` and link them here.
+### State Pride Gallery (Catalog)
+
+![Catalog gallery screen](docs/screenshots/catalog_gallery.png)
+
+### Story Generator
+
+![Story generator form](docs/screenshots/story_generator_form.png)
+
+### Story Card Preview & Share
+
+![Story card preview with share and save options](docs/screenshots/story_card_preview.png)
 
 ---
 
